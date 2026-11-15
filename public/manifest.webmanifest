@@ -1,0 +1,32 @@
+{
+  "id": "/",
+  "name": "Vs Tests",
+  "short_name": "Vs Tests",
+  "description": "Vs Tests – Online Test Series Portal.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#eef6ff",
+  "theme_color": "#eef6ff",
+  "icons": [
+    {
+      "src": "/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}

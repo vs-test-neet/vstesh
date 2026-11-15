@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <meta name="theme-color" content="#eef6ff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Vs Tests" />
+    <title>Vs Tests</title>
+    <meta name="description" content="Vs Tests – Online Test Series and Practice Portal." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vs Tests" />
+    <meta property="og:title" content="Vs Tests" />
+    <meta property="og:description" content="Vs Tests – Online Test Series and Practice Portal." />
+    <meta property="og:image" content="/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Vs Tests" />
+    <meta name="twitter:description" content="Vs Tests – Online Test Series and Practice Portal." />
+    <meta name="twitter:image" content="/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3" />
+    <link rel="icon" type="image/jpeg" href="/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3" />
+    <link rel="apple-touch-icon" href="/assets/aistudio/Screenshot_2026-11-11-14-19-47-09_40deb401b9ffe8e1df2f1cc5ba480b12_d6e28b87.jpg?v=3" />
+    <link rel="manifest" href="/manifest.webmanifest?v=3" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <script>
+      window.addEventListener('unhandledrejection', function (event) {
+        var msg = event && event.reason && (event.reason.message || String(event.reason));
+        if (typeof msg === 'string' && msg.indexOf('WebSocket closed without opened') !== -1) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function (event) {
+        var msg = event && (event.message || (event.error && event.error.message));
+        if (typeof msg === 'string' && msg.indexOf('WebSocket closed without opened') !== -1) {
+          event.preventDefault();
+        }
+      });
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+    </script>
+  </body>
+</html>

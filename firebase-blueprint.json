@@ -1,0 +1,178 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile storing role (admin or student) and display information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "role": { "type": "string", "enum": ["admin", "student"], "description": "Role of the user" },
+        "createdAt": { "type": "number", "description": "Epoch timestamp in ms" }
+      },
+      "required": ["uid", "role", "createdAt"]
+    },
+    "StudentAccount": {
+      "title": "StudentAccount",
+      "description": "Registered NEET student account for sign up, login, profile photo, and progress tracking.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique student ID" },
+        "fullName": { "type": "string", "description": "Student full name" },
+        "emailOrRoll": { "type": "string", "description": "Student email or roll number" },
+        "phone": { "type": "string", "description": "Student phone number" },
+        "photoUrl": { "type": "string", "description": "Student profile picture URL or data URI" },
+        "passwordHash": { "type": "string", "description": "Encoded student password credential" },
+        "passwordPlain": { "type": "string", "description": "Student password for admin verification" },
+        "targetBatch": { "type": "string", "description": "Target NEET batch e.g. NEET 2027" },
+        "city": { "type": "string", "description": "Student city or center" },
+        "loginCount": { "type": "number", "description": "Total number of logins" },
+        "createdAt": { "type": "number", "description": "Registration timestamp" },
+        "lastLoginAt": { "type": "number", "description": "Last login timestamp" }
+      },
+      "required": ["id", "fullName", "emailOrRoll", "passwordHash", "targetBatch", "createdAt", "lastLoginAt"]
+    },
+    "TestFolder": {
+      "title": "TestFolder",
+      "description": "Admin-managed folder for organizing NEET CBT tests on the homepage and studio.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique folder identifier" },
+        "name": { "type": "string", "description": "Folder display name" },
+        "description": { "type": "string", "description": "Optional folder subtitle or description" },
+        "createdAt": { "type": "number", "description": "Creation timestamp in ms" }
+      },
+      "required": ["id", "name", "createdAt"]
+    },
+    "CbtTest": {
+      "title": "CbtTest",
+      "description": "NEET CBT Test metadata, difficulty level, folder assignment, and student engagement analytics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique test identifier" },
+        "title": { "type": "string", "description": "Test title" },
+        "subTitle": { "type": "string", "description": "Institute and series subtitle" },
+        "chapter": { "type": "string", "description": "Chapters covered in the test" },
+        "subject": { "type": "string", "description": "Subject name e.g. Biology (जीव विज्ञान)" },
+        "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"], "description": "Difficulty level tag" },
+        "folderId": { "type": "string", "description": "Parent folder ID" },
+        "folderName": { "type": "string", "description": "Parent folder name" },
+        "totalQuestions": { "type": "number", "description": "Total number of questions" },
+        "maxMarks": { "type": "number", "description": "Maximum marks" },
+        "correctMarks": { "type": "number", "description": "Marks awarded for a correct answer" },
+        "negativeMarks": { "type": "number", "description": "Marks deducted for a wrong answer" },
+        "durationMinutes": { "type": "number", "description": "Test duration in minutes" },
+        "openCount": { "type": "number", "description": "Number of times the test was opened by students" },
+        "playCount": { "type": "number", "description": "Number of times the test was started/played by students" },
+        "completionCount": { "type": "number", "description": "Number of times the test was submitted/completed" },
+        "totalScoreSum": { "type": "number", "description": "Cumulative sum of scores across completed attempts" },
+        "highScore": { "type": "number", "description": "Highest score achieved on this test" },
+        "isBuiltIn": { "type": "boolean", "description": "Whether this test loads base questions from bundled HTML asset" },
+        "assetUrl": { "type": "string", "description": "Optional local asset URL for built-in HTML test" },
+        "chunkCount": { "type": "number", "description": "Number of question chunks stored in subcollection" },
+        "htmlChunkCount": { "type": "number", "description": "Number of raw HTML chunks stored in subcollection" },
+        "createdAt": { "type": "number", "description": "Creation timestamp in ms" },
+        "lastPlayedAt": { "type": "number", "description": "Last played timestamp in ms" }
+      },
+      "required": [
+        "id",
+        "title",
+        "subject",
+        "totalQuestions",
+        "maxMarks",
+        "correctMarks",
+        "negativeMarks",
+        "durationMinutes",
+        "openCount",
+        "playCount",
+        "completionCount",
+        "createdAt"
+      ]
+    },
+    "QuestionChunk": {
+      "title": "QuestionChunk",
+      "description": "Chunk of serialized CBT questions to stay well below Firestore 1MB limit.",
+      "type": "object",
+      "properties": {
+        "index": { "type": "number", "description": "Chunk order index" },
+        "questionsJson": { "type": "string", "description": "JSON string of questions array slice" }
+      },
+      "required": ["index", "questionsJson"]
+    },
+    "HtmlChunk": {
+      "title": "HtmlChunk",
+      "description": "Chunk of raw uploaded HTML file so the exact original HTML paper can be rendered unaltered.",
+      "type": "object",
+      "properties": {
+        "index": { "type": "number", "description": "Chunk order index" },
+        "htmlPart": { "type": "string", "description": "Substring of raw HTML document" }
+      },
+      "required": ["index", "htmlPart"]
+    },
+    "TestAttempt": {
+      "title": "TestAttempt",
+      "description": "Record of a student playing or completing a NEET CBT test.",
+      "type": "object",
+      "properties": {
+        "testId": { "type": "string", "description": "ID of the test played" },
+        "testTitle": { "type": "string", "description": "Title of the test" },
+        "studentId": { "type": "string", "description": "Student account ID" },
+        "studentEmail": { "type": "string", "description": "Student email or roll number for cross-session history recovery" },
+        "studentName": { "type": "string", "description": "Name of the student" },
+        "studentBatch": { "type": "string", "description": "Student batch" },
+        "score": { "type": "number", "description": "Final score obtained" },
+        "maxMarks": { "type": "number", "description": "Maximum marks possible" },
+        "correctCount": { "type": "number", "description": "Number of correct answers" },
+        "wrongCount": { "type": "number", "description": "Number of wrong answers" },
+        "unattemptedCount": { "type": "number", "description": "Number of unattempted questions" },
+        "accuracy": { "type": "number", "description": "Accuracy percentage (0 to 100)" },
+        "timeTakenSeconds": { "type": "number", "description": "Total time spent in seconds" },
+        "completedAt": { "type": "number", "description": "Completion timestamp in ms" }
+      },
+      "required": [
+        "testId",
+        "testTitle",
+        "studentName",
+        "score",
+        "maxMarks",
+        "correctCount",
+        "wrongCount",
+        "unattemptedCount",
+        "accuracy",
+        "timeTakenSeconds",
+        "completedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles and roles"
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/StudentAccount" },
+      "description": "Registered NEET student accounts"
+    },
+    "/folders/{folderId}": {
+      "schema": { "$ref": "#/entities/TestFolder" },
+      "description": "Admin test folders"
+    },
+    "/tests/{testId}": {
+      "schema": { "$ref": "#/entities/CbtTest" },
+      "description": "NEET CBT Tests metadata and open/play analytics"
+    },
+    "/tests/{testId}/questionChunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/QuestionChunk" },
+      "description": "Chunked question payloads for uploaded HTML/PDF tests"
+    },
+    "/tests/{testId}/htmlChunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/HtmlChunk" },
+      "description": "Chunked raw HTML file content for exact HTML test rendering"
+    },
+    "/attempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/TestAttempt" },
+      "description": "Completed student test attempts for analytics"
+    }
+  }
+}

@@ -1,0 +1,190 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection validation endpoint
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == "rahulyadav89762@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidStudentAccount(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 150 &&
+             data.emailOrRoll is string && data.emailOrRoll.size() > 0 && data.emailOrRoll.size() <= 150 &&
+             data.passwordHash is string && data.passwordHash.size() > 0 && data.passwordHash.size() <= 250 &&
+             data.targetBatch is string && data.targetBatch.size() <= 150 &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 250000)) &&
+             data.createdAt is number &&
+             data.lastLoginAt is number;
+    }
+
+    function isValidFolder(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+             data.createdAt is number;
+    }
+
+    function isValidTestMetadata(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 500 &&
+             data.subject is string && data.subject.size() <= 300 &&
+             (!('difficulty' in data) || data.difficulty in ['Easy', 'Medium', 'Hard']) &&
+             (!('folderId' in data) || (data.folderId is string && data.folderId.size() <= 128)) &&
+             (!('folderName' in data) || (data.folderName is string && data.folderName.size() <= 200)) &&
+             data.totalQuestions is number && data.totalQuestions >= 0 && data.totalQuestions <= 1000 &&
+             data.maxMarks is number && data.maxMarks >= 0 && data.maxMarks <= 10000 &&
+             data.correctMarks is number && data.correctMarks >= 0 &&
+             data.negativeMarks is number && data.negativeMarks >= 0 &&
+             data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1000 &&
+             data.openCount is number && data.openCount >= 0 &&
+             data.playCount is number && data.playCount >= 0 &&
+             data.completionCount is number && data.completionCount >= 0 &&
+             data.createdAt is number;
+    }
+
+    function isValidAnalyticsUpdate() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['openCount', 'playCount', 'completionCount', 'totalScoreSum', 'highScore', 'lastPlayedAt']) &&
+             request.resource.data.openCount is number &&
+             request.resource.data.openCount >= resource.data.openCount &&
+             request.resource.data.playCount is number &&
+             request.resource.data.playCount >= resource.data.playCount &&
+             request.resource.data.completionCount is number &&
+             request.resource.data.completionCount >= resource.data.completionCount;
+    }
+
+    function isValidQuestionChunk(data) {
+      return data.index is number &&
+             data.index >= 0 &&
+             data.index <= 1000 &&
+             data.questionsJson is string &&
+             data.questionsJson.size() <= 1000000;
+    }
+
+    function isValidHtmlChunk(data) {
+      return data.index is number &&
+             data.index >= 0 &&
+             data.index <= 1000 &&
+             data.htmlPart is string &&
+             data.htmlPart.size() <= 1000000;
+    }
+
+    function isValidAttempt(data) {
+      return data.testId is string && data.testId.size() > 0 && data.testId.size() <= 128 &&
+             data.testTitle is string && data.testTitle.size() <= 500 &&
+             data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 200 &&
+             (!('studentEmail' in data) || (data.studentEmail is string && data.studentEmail.size() <= 200)) &&
+             data.score is number &&
+             data.maxMarks is number &&
+             data.correctCount is number &&
+             data.wrongCount is number &&
+             data.unattemptedCount is number &&
+             data.accuracy is number &&
+             data.timeTakenSeconds is number &&
+             data.completedAt is number;
+    }
+
+    // ===============================================================
+    // Users Collection (PII Isolated to Owner / Admin)
+    // ===============================================================
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       request.resource.data.uid == userId &&
+                       request.resource.data.role in ['admin', 'student'] &&
+                       request.resource.data.createdAt is number;
+      allow update: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       request.resource.data.uid == resource.data.uid &&
+                       request.resource.data.createdAt == resource.data.createdAt &&
+                       request.resource.data.role == resource.data.role;
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // ===============================================================
+    // Students Collection (Student Sign Up, Login & Profile Updates)
+    // ===============================================================
+    match /students/{studentId} {
+      allow get: if isValidId(studentId);
+      allow list: if true;
+      allow create, update: if isValidId(studentId) && isValidStudentAccount(request.resource.data);
+      allow delete: if isValidId(studentId);
+    }
+
+    // ===============================================================
+    // Folders Collection (Admin Folder Organization)
+    // ===============================================================
+    match /folders/{folderId} {
+      allow get: if isValidId(folderId);
+      allow list: if true;
+      allow create, update: if isValidId(folderId) && isValidFolder(request.resource.data);
+      allow delete: if isValidId(folderId);
+    }
+
+    // ===============================================================
+    // Tests Collection, Question Chunks & Raw HTML Chunks
+    // ===============================================================
+    match /tests/{testId} {
+      allow get: if isValidId(testId);
+      allow list: if true;
+      allow create: if isValidId(testId) && isValidTestMetadata(request.resource.data);
+      allow update: if isValidId(testId) && (isValidAnalyticsUpdate() || isValidTestMetadata(request.resource.data));
+      allow delete: if isValidId(testId);
+
+      match /questionChunks/{chunkId} {
+        allow get: if isValidId(chunkId);
+        allow list: if true;
+        allow create, update: if isValidId(chunkId) && isValidQuestionChunk(request.resource.data);
+        allow delete: if isValidId(chunkId);
+      }
+
+      match /htmlChunks/{chunkId} {
+        allow get: if isValidId(chunkId);
+        allow list: if true;
+        allow create, update: if isValidId(chunkId) && isValidHtmlChunk(request.resource.data);
+        allow delete: if isValidId(chunkId);
+      }
+    }
+
+    // ===============================================================
+    // Student Test Attempts Collection
+    // ===============================================================
+    match /attempts/{attemptId} {
+      allow get: if isValidId(attemptId);
+      allow list: if true;
+      allow create: if isValidId(attemptId) && isValidAttempt(request.resource.data);
+      allow update: if isValidId(attemptId) && isValidAttempt(request.resource.data);
+      allow delete: if isValidId(attemptId);
+    }
+  }
+}

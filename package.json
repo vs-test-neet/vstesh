@@ -1,0 +1,38 @@
+{
+  "name": "react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && find node_modules -name '*.map' -delete 2>/dev/null; rm -rf node_modules/lucide-react/dist/umd node_modules/lucide-react/dist/cjs node_modules/@napi-rs node_modules/pdfjs-dist/web node_modules/pdfjs-dist/wasm node_modules/pdfjs-dist/cmaps node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs node_modules/pdfjs-dist/legacy/build/pdf.mjs node_modules/typescript/lib/typescript.js node_modules/typescript/lib/cs node_modules/typescript/lib/de node_modules/typescript/lib/es node_modules/typescript/lib/fr node_modules/typescript/lib/it node_modules/typescript/lib/ja node_modules/typescript/lib/ko node_modules/typescript/lib/pl node_modules/typescript/lib/pt-br node_modules/typescript/lib/ru node_modules/typescript/lib/tr node_modules/typescript/lib/zh-cn node_modules/typescript/lib/zh-tw node_modules/@firebase/auth/dist/cordova node_modules/@firebase/auth/dist/rn node_modules/@firebase/auth/dist/web-extension-esm node_modules/@firebase/auth/dist/web-extension-cjs node_modules/@firebase/auth/dist/browser-cjs node_modules/@firebase/auth/dist/node node_modules/@firebase/auth/dist/node-esm node_modules/@google/genai/dist/web node_modules/@google/genai/dist/index.cjs 2>/dev/null; mkdir -p node_modules/pdfjs-dist/build && cp -f node_modules/pdfjs-dist/legacy/build/pdf.min.mjs node_modules/pdfjs-dist/build/pdf.mjs && cp -f node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs node_modules/pdfjs-dist/build/pdf.worker.min.mjs 2>/dev/null || true",
+    "postinstall": "find node_modules -name '*.map' -delete 2>/dev/null; rm -rf node_modules/lucide-react/dist/umd node_modules/lucide-react/dist/cjs node_modules/@napi-rs node_modules/pdfjs-dist/web node_modules/pdfjs-dist/wasm node_modules/pdfjs-dist/cmaps node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs node_modules/pdfjs-dist/legacy/build/pdf.mjs node_modules/typescript/lib/typescript.js node_modules/typescript/lib/cs node_modules/typescript/lib/de node_modules/typescript/lib/es node_modules/typescript/lib/fr node_modules/typescript/lib/it node_modules/typescript/lib/ja node_modules/typescript/lib/ko node_modules/typescript/lib/pl node_modules/typescript/lib/pt-br node_modules/typescript/lib/ru node_modules/typescript/lib/tr node_modules/typescript/lib/zh-cn node_modules/typescript/lib/zh-tw node_modules/@firebase/auth/dist/cordova node_modules/@firebase/auth/dist/rn node_modules/@firebase/auth/dist/web-extension-esm node_modules/@firebase/auth/dist/web-extension-cjs node_modules/@firebase/auth/dist/browser-cjs node_modules/@firebase/auth/dist/node node_modules/@firebase/auth/dist/node-esm node_modules/@google/genai/dist/web node_modules/@google/genai/dist/index.cjs 2>/dev/null; mkdir -p node_modules/pdfjs-dist/build && cp -f node_modules/pdfjs-dist/legacy/build/pdf.min.mjs node_modules/pdfjs-dist/build/pdf.mjs && cp -f node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs node_modules/pdfjs-dist/build/pdf.worker.min.mjs 2>/dev/null || true",
+    "start": "node server.ts",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@firebase/app": "^0.16.5",
+    "@firebase/auth": "^1.13.9",
+    "@google/genai": "^3.0.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "lucide-react": "^0.546.0",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.2"
+  }
+}

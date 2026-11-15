@@ -1,0 +1,6 @@
+{
+  "name": "NEET IceGlass CBT Studio",
+  "description": "Vs Tests – Online CBT Test Platform & Admin Studio with multi-file HTML/PDF test upload, liquid glass folders, and instant analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
