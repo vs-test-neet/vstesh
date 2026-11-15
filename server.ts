@@ -76,8 +76,8 @@ let cachedBootstrapVersion = -1;
 // Keeps hot tests at 0ms while preventing Node heap OOM during large batch HTML uploads
 const testFileBufferCache = new Map<string, Buffer>();
 let currentCachedTestBytes = 0;
-const MAX_CACHED_TEST_BUFFERS = 20;
-const MAX_CACHED_TEST_BYTES = 48 * 1024 * 1024; // 48 MB strict RAM LRU cap; disk .bin serves rest in <5ms
+const MAX_CACHED_TEST_BUFFERS = 40;
+const MAX_CACHED_TEST_BYTES = 320 * 1024 * 1024; // 320 MB RAM LRU cap so all active tests serve in <1ms
 
 interface PendingChunkState<T> {
   total: number;
@@ -129,11 +129,11 @@ const DUPLICATE_TEST_FILE_ALIASES: Record<string, string> = {
 const FALLBACK_DONOR_TEST_FILES: Record<string, string> = {
   test_mwf3a4c1: 'test_mwdt8qzq_2_du0l',
   test_mwdhvcaq_0_eafm: 'test_mwdhw8uw_3_6bsu',
-  test_mwdhvobl_1_0qjb: 'test_mwdrf1ga_2_kzkl',
-  test_mwdhw157_2_27vi: 'test_mwdrf6y3_5_fffq',
+  test_mwdhvobl_1_0qjb: 'test_mwdhw8uw_3_6bsu',
+  test_mwdhw157_2_27vi: 'test_mwdhw8uw_3_6bsu',
   test_mwdhwiv3_4_an2y: 'test_mwdhw8uw_3_6bsu',
-  test_mwdhwth6_5_twu2: 'test_mwdrf1ga_2_kzkl',
-  test_mwdhx1l7_6_azuh: 'test_mwdrf6y3_5_fffq',
+  test_mwdhwth6_5_twu2: 'test_mwdhw8uw_3_6bsu',
+  test_mwdhx1l7_6_azuh: 'test_mwdhw8uw_3_6bsu',
 };
 
 function hasMeaningfulQuestionText(q: Record<string, unknown>): boolean {
@@ -819,6 +819,7 @@ async function startServer() {
     }
 
     const isBufferPlayable = (buf: Buffer): boolean => {
+      if (buf.byteLength > 120000) return true;
       try {
         const parsed = JSON.parse(buf.toString('utf-8'));
         const htmlStr = typeof parsed?.rawHtml === 'string' ? parsed.rawHtml.trim() : '';

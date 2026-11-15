@@ -200,52 +200,17 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
     return fallback;
   }, []);
 
-  // Guarantee every question is normalized and re-hydrated with diagrams from rawHtmlContent if compacted
+  // Guarantee every question is normalized without re-running slow 12MB HTML parsing when questions already exist
   const questions = useMemo(() => {
     let safeList = Array.isArray(rawQuestions) ? rawQuestions : [];
     const needsHtmlHydration =
-      Boolean(rawHtmlContent && rawHtmlContent.trim().length > 200) &&
-      (safeList.length === 0 ||
-        safeList.some(
-          (q) =>
-            !q?.imageHi &&
-            !q?.imageEn &&
-            !q?.imageUrl &&
-            !q?.explanation?.hi?.includes('data:image/') &&
-            !q?.explanation?.en?.includes('data:image/')
-        ));
+      safeList.length === 0 && Boolean(rawHtmlContent && rawHtmlContent.trim().length > 200);
 
     if (needsHtmlHydration && rawHtmlContent) {
       try {
         const parsed = parseCbtHtmlFile(rawHtmlContent, testMeta.title);
-        if (parsed.questions && parsed.questions.length > 0) {
-          if (safeList.length === 0) {
-            safeList = parsed.questions;
-          } else {
-            safeList = safeList.map((q, idx) => {
-              const pq = parsed.questions[idx];
-              if (!pq) return q;
-              return {
-                ...pq,
-                ...q,
-                imageHi: q.imageHi || pq.imageHi,
-                imageEn: q.imageEn || pq.imageEn,
-                imageUrl: q.imageUrl || pq.imageUrl,
-                questionHi: q.questionHi || pq.questionHi || '',
-                questionEn: q.questionEn || pq.questionEn || '',
-                explanation: {
-                  hi:
-                    q.explanation?.hi && q.explanation.hi.length >= (pq.explanation?.hi?.length || 0)
-                      ? q.explanation.hi
-                      : pq.explanation?.hi || q.explanation?.hi || '',
-                  en:
-                    q.explanation?.en && q.explanation.en.length >= (pq.explanation?.en?.length || 0)
-                      ? q.explanation.en
-                      : pq.explanation?.en || q.explanation?.en || '',
-                },
-              };
-            });
-          }
+        if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+          safeList = parsed.questions;
         }
       } catch {
         // ignore hydration errors
@@ -1637,7 +1602,7 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
   // Extra-large readable font size class for questions and options
   const fontSizeClass = 'text-2xl sm:text-3xl md:text-4xl font-extrabold leading-relaxed tracking-tight';
 
-  const currentQ = questions[currentIdx];
+  const currentQ = questions[currentIdx] || questions[0];
   const currentQTime = questionTimes[currentIdx] || 0;
   const isSlowQuestion = currentQTime >= 120;
 
@@ -1810,14 +1775,21 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
     if (!exactHtmlMode || isSubmitted) return '';
     const trimmedRaw = (rawHtmlContent || '').trim();
 
-    const rawBaseHtml = (
+    const sourceHtml =
       trimmedRaw.length > 20
         ? trimmedRaw
-        : buildStandaloneCbtHtmlFromQuestions(testMeta, questions)
-    ).replace(
-      /<script>\(function\(\)\{function c\(\)\{var b=a\.contentDocument[\s\S]*?<\/script>/gi,
-      ''
-    );
+        : buildStandaloneCbtHtmlFromQuestions(testMeta, questions);
+
+    // Strip trailing Cloudflare challenge script only in the tail slice so 12.6MB HTML strings aren't full-scanned
+    const tailOffset = Math.max(0, sourceHtml.length - 4096);
+    const rawBaseHtml =
+      sourceHtml.slice(0, tailOffset) +
+      sourceHtml
+        .slice(tailOffset)
+        .replace(
+          /<script>\(function\(\)\{function c\(\)\{var b=a\.contentDocument[\s\S]*?<\/script>/gi,
+          ''
+        );
 
     // Pre-execution head script: isolates generic localStorage keys per testId AND clears any stale
     // `submitted: true` / `remainingSec <= 60` / expired `cbt_start` so uploaded HTML tests NEVER get stuck or refuse to run!
@@ -1896,8 +1868,11 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
         'buildAnalysis(); showAnalysis(); try { if (typeof window.__vsNotifySubmitted === "function") window.__vsNotifySubmitted(); } catch(e) {}'
       );
 
-    if (/<head[^>]*>/i.test(baseHtml)) {
-      baseHtml = baseHtml.replace(/<head[^>]*>/i, (m) => `${m}${preBootSanitizerScript}`);
+    const headMatch = /<head[^>]*>/i.exec(baseHtml);
+    if (headMatch && typeof headMatch.index === 'number') {
+      const insertPos = headMatch.index + headMatch[0].length;
+      baseHtml =
+        baseHtml.slice(0, insertPos) + preBootSanitizerScript + baseHtml.slice(insertPos);
     } else {
       baseHtml = `${preBootSanitizerScript}${baseHtml}`;
     }
@@ -2238,12 +2213,42 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
 })();
 </script>`;
 
-    if (baseHtml.includes('</body>')) {
-      return baseHtml.replace('</body>', `${bridgeScript}</body>`);
+    const lastBodyCloseIdx = baseHtml.toLowerCase().lastIndexOf('</body>');
+    if (lastBodyCloseIdx !== -1) {
+      return (
+        baseHtml.slice(0, lastBodyCloseIdx) +
+        bridgeScript +
+        baseHtml.slice(lastBodyCloseIdx)
+      );
     }
     return `${baseHtml}${bridgeScript}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exactHtmlMode, isSubmitted, rawHtmlContent, testMeta.id]);
+
+  // Create a fast same-origin Blob URL for large HTML papers so 12.6MB strings never choke iframe srcDoc
+  const htmlBlobUrl = useMemo(() => {
+    if (!effectiveHtmlDoc || typeof URL === 'undefined' || typeof Blob === 'undefined') {
+      return '';
+    }
+    try {
+      const blob = new Blob([effectiveHtmlDoc], { type: 'text/html;charset=utf-8' });
+      return URL.createObjectURL(blob);
+    } catch {
+      return '';
+    }
+  }, [effectiveHtmlDoc]);
+
+  useEffect(() => {
+    return () => {
+      if (htmlBlobUrl) {
+        try {
+          URL.revokeObjectURL(htmlBlobUrl);
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [htmlBlobUrl]);
 
   const hasRecordedHtmlSubmitRef = useRef(false);
 
@@ -2539,6 +2544,59 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
     testMeta.subject,
     testMeta.title,
   ]);
+
+  if (exactHtmlMode && !isSubmitted && effectiveHtmlDoc) {
+    return (
+      <div className="fixed inset-0 z-50 w-full h-dvh flex flex-col bg-[#effaff] overflow-hidden">
+        {renderShareScorecardModal()}
+        {renderPdfGeneratingOverlay()}
+        {!htmlBridgeReady && showHtmlFallbackExit && (
+          <button
+            type="button"
+            onClick={() => {
+              persistInProgressSnapshot();
+              onExit();
+            }}
+            className="fixed top-2.5 left-2.5 z-[60] px-3 py-1.5 rounded-xl bg-white/95 hover:bg-white text-sky-900 border border-sky-300 shadow-lg text-xs font-extrabold cursor-pointer"
+          >
+            ← Back to Home
+          </button>
+        )}
+        {htmlResultOverride && (
+          <div className="fixed bottom-4 right-4 z-[65] flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isGeneratingQuestionPdf}
+              onClick={() => handleDownloadQuestionPaperPdf(htmlResultOverride)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-sky-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 disabled:opacity-60 text-white text-xs sm:text-sm font-extrabold shadow-xl border border-white/30 cursor-pointer transition"
+            >
+              {isGeneratingQuestionPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileDown className="w-4 h-4" />
+              )}
+              <span>Download Question PDF (VS)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleShareResult('open_modal', htmlResultOverride)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white text-xs sm:text-sm font-extrabold shadow-xl border border-white/30 cursor-pointer transition"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share Scorecard</span>
+            </button>
+          </div>
+        )}
+        <iframe
+          src={htmlBlobUrl || undefined}
+          srcDoc={htmlBlobUrl ? undefined : effectiveHtmlDoc}
+          title={testMeta.title}
+          className="w-full flex-1 h-full border-0 bg-white"
+        />
+      </div>
+    );
+  }
 
   if (!currentQ) {
     return (
@@ -3422,57 +3480,7 @@ export const CbtExamRunner: React.FC<CbtExamRunnerProps> = ({
     );
   }
 
-  if (exactHtmlMode && !isSubmitted && effectiveHtmlDoc) {
-    return (
-      <div className="fixed inset-0 z-50 w-full h-dvh flex flex-col bg-[#effaff] overflow-hidden">
-        {renderShareScorecardModal()}
-        {renderPdfGeneratingOverlay()}
-        {!htmlBridgeReady && showHtmlFallbackExit && (
-          <button
-            type="button"
-            onClick={() => {
-              persistInProgressSnapshot();
-              onExit();
-            }}
-            className="fixed top-2.5 left-2.5 z-[60] px-3 py-1.5 rounded-xl bg-white/95 hover:bg-white text-sky-900 border border-sky-300 shadow-lg text-xs font-extrabold cursor-pointer"
-          >
-            ← Back to Home
-          </button>
-        )}
-        {htmlResultOverride && (
-          <div className="fixed bottom-4 right-4 z-[65] flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={isGeneratingQuestionPdf}
-              onClick={() => handleDownloadQuestionPaperPdf(htmlResultOverride)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-sky-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 disabled:opacity-60 text-white text-xs sm:text-sm font-extrabold shadow-xl border border-white/30 cursor-pointer transition"
-            >
-              {isGeneratingQuestionPdf ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FileDown className="w-4 h-4" />
-              )}
-              <span>Download Question PDF (VS)</span>
-            </button>
 
-            <button
-              type="button"
-              onClick={() => handleShareResult('open_modal', htmlResultOverride)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white text-xs sm:text-sm font-extrabold shadow-xl border border-white/30 cursor-pointer transition"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share Scorecard</span>
-            </button>
-          </div>
-        )}
-        <iframe
-          srcDoc={effectiveHtmlDoc}
-          title={testMeta.title}
-          className="w-full flex-1 h-full border-0 bg-white"
-        />
-      </div>
-    );
-  }
 
   // ============================================================================
   // LIVE INTERACTIVE TEST & PRACTICE RUNNER

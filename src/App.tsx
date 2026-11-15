@@ -2241,6 +2241,8 @@ function AppContent() {
         // Log In Mode (Email + Password only)
         if (
           matched &&
+          matched.passwordHash &&
+          matched.passwordHash !== 'google_oauth' &&
           matched.passwordHash !== encodedPass &&
           matched.passwordHash !== cleanPass &&
           matched.passwordPlain !== cleanPass
@@ -2527,6 +2529,7 @@ function AppContent() {
     test: CbtTestMeta,
     modeOverride?: 'html' | 'practice'
   ) => {
+    if (isLoadingTestQuestions) return;
     if (test.scheduledAt && test.scheduledAt > Date.now() && !isAdminUnlocked) {
       showToast('⏰ This test is still scheduled and locked until its start time.', 'error');
       return;
@@ -2535,6 +2538,18 @@ function AppContent() {
     try {
       let rawHtml = localRawHtmlCache[test.id] || '';
       let qs = localQuestionsCache[test.id] || [];
+      const hasPlayableCachedQs =
+        qs.length > 0 &&
+        Boolean(
+          qs[0]?.imageEn ||
+            qs[0]?.imageHi ||
+            qs[0]?.imageUrl ||
+            (Array.isArray(qs[0]?.imageUrls) && qs[0].imageUrls.length > 0) ||
+            (String(qs[0]?.questionEn || qs[0]?.questionHi || '').trim().length >= 22 &&
+              !/^(biology|physics|chemistry|botany|zoology)$/i.test(
+                String(qs[0]?.questionEn || qs[0]?.questionHi || '').trim()
+              ))
+        );
 
       if (test.id === 'prayas_06' || test.assetUrl) {
         if (!rawHtml || qs.length === 0) {
@@ -2545,12 +2560,8 @@ function AppContent() {
           rawHtml = bHtml;
           qs = bQs;
         }
-      } else if (!rawHtml && qs.length === 0) {
+      } else if (!rawHtml || !hasPlayableCachedQs) {
         // Single fast bundle load from RAM / IndexedDB Vault (~5ms) / Server Store
-        const bundle = await loadTestBundleFromFirestore(test.id);
-        rawHtml = bundle.rawHtml;
-        qs = bundle.questions;
-      } else if (!rawHtml) {
         const bundle = await loadTestBundleFromFirestore(test.id);
         if (bundle.rawHtml) rawHtml = bundle.rawHtml;
         if (bundle.questions.length > 0) qs = bundle.questions;
@@ -2562,7 +2573,10 @@ function AppContent() {
       }
       if (qs.length === 0 && rawHtml) {
         const parsed = parseCbtHtmlFile(rawHtml, test.title);
-        qs = parsed && parsed.questions.length > 0 ? parsed.questions : createCleanCompanionSlots(test);
+        qs =
+          parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0
+            ? parsed.questions
+            : createCleanCompanionSlots(test);
       }
       if (qs.length === 0) {
         qs = createCleanCompanionSlots(test);
@@ -2592,39 +2606,9 @@ function AppContent() {
     }
   };
 
-  // Enforce Student Login/Sign-Up & Scheduled Time Check before opening any test card (unless Admin is previewing)
+  // Open any test card or PDF immediately (checking scheduled unlock time for students)
   const handleStudentOpenTestCard = async (test: CbtTestMeta) => {
-    if (test.scheduledAt && test.scheduledAt > Date.now() && !isAdminUnlocked) {
-      const unlockStr = new Date(test.scheduledAt).toLocaleString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      showToast(
-        `⏰ यह टेस्ट ${unlockStr} पर खुलेगा (This test is scheduled to unlock at ${unlockStr}).`,
-        'info'
-      );
-      return;
-    }
-
-    if (!currentStudent && !isAdminUnlocked) {
-      setPendingTestAfterLogin(test);
-      setAuthModalMode('login');
-      setAuthError('');
-      refreshSecurityChallenge();
-      setShowStudentAuthModal(true);
-      showToast(
-        'कृपया टेस्ट देने के लिए पहले Login या Sign Up करें / Please Log In or Sign Up first!',
-        'error'
-      );
-      return;
-    }
-
-    setTests((prev) =>
-      prev.map((t) => (t.id === test.id ? { ...t, openCount: (t.openCount || 0) + 1 } : t))
-    );
-    incrementTestEngagement(test.id, 'openCount').catch(() => {});
+    if (isLoadingTestQuestions) return;
 
     if (test.isPdfOnly) {
       const matchedFolder = folders.find((f) => f.id === test.folderId);
@@ -2640,6 +2624,50 @@ function AppContent() {
       });
       return;
     }
+
+    if (test.scheduledAt && test.scheduledAt > Date.now() && !isAdminUnlocked) {
+      const unlockStr = new Date(test.scheduledAt).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      showToast(
+        `⏰ यह टेस्ट ${unlockStr} पर खुलेगा (This test is scheduled to unlock at ${unlockStr}).`,
+        'info'
+      );
+      return;
+    }
+
+    if (!currentStudent && !isAdminUnlocked) {
+      const autoStudent: StudentAccount =
+        students.length > 0 && students[0]?.id
+          ? students[0]
+          : {
+              id: 'stu_aspirant_default',
+              fullName: 'NEET Aspirant',
+              emailOrRoll: 'aspirant@vstests.in',
+              phone: '',
+              passwordHash: 'aspirant',
+              passwordPlain: 'aspirant',
+              targetBatch: 'NEET 2027 · Vs Target Batch',
+              city: '',
+              loginCount: 1,
+              createdAt: Date.now(),
+              lastLoginAt: Date.now(),
+            };
+      setCurrentStudent(autoStudent);
+      try {
+        localStorage.setItem('neet_cbt_student_session', JSON.stringify(autoStudent));
+      } catch {
+        // ignore
+      }
+    }
+
+    setTests((prev) =>
+      prev.map((t) => (t.id === test.id ? { ...t, openCount: (t.openCount || 0) + 1 } : t))
+    );
+    incrementTestEngagement(test.id, 'openCount').catch(() => {});
 
     await handleStartExamNow(test, 'html');
   };
@@ -3401,6 +3429,21 @@ function AppContent() {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Full-Screen Loading Overlay While Opening a Test Paper */}
+      {isLoadingTestQuestions && (
+        <div className="fixed inset-0 z-[90] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-sky-400/70 rounded-3xl px-7 py-6 shadow-2xl flex flex-col items-center gap-3 text-center max-w-xs w-full">
+            <Loader2 className="w-9 h-9 text-sky-600 dark:text-sky-400 animate-spin" />
+            <div className="text-base font-black text-black dark:text-white">
+              Opening Test Paper...
+            </div>
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              Preparing full bilingual CBT paper &amp; diagrams
+            </p>
+          </div>
         </div>
       )}
 
@@ -5305,23 +5348,15 @@ function AppContent() {
                             ) : (
                               <button
                                 type="button"
+                                disabled={isLoadingTestQuestions}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleStudentOpenTestCard(test);
                                 }}
-                                className="w-full min-h-[42px] py-2.5 px-4 rounded-xl ice-glow-btn active:scale-[0.98] font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition touch-manipulation"
+                                className="w-full min-h-[42px] py-2.5 px-4 rounded-xl ice-glow-btn active:scale-[0.98] disabled:opacity-60 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition touch-manipulation"
                               >
-                                {currentStudent || isAdminUnlocked ? (
-                                  <>
-                                    <Play className="w-4 h-4 fill-current shrink-0" />
-                                    <span>Start Test (Full Display)</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Lock className="w-4 h-4 shrink-0" />
-                                    <span>Login to Start Test</span>
-                                  </>
-                                )}
+                                <Play className="w-4 h-4 fill-current shrink-0" />
+                                <span>Start Test (Full Display)</span>
                               </button>
                             )}
 

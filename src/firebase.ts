@@ -1249,9 +1249,9 @@ export async function loadTestBundleFromFirestore(
 
   // Only return early from IndexedDB Vault if it has full HTML OR genuinely playable questions!
   if (vaultHtml.trim().length > 200 || areQuestionsPlayable(vaultQs)) {
-    if (vaultHtml.trim().length > 200 && !areQuestionsPlayable(vaultQs)) {
+    if (vaultHtml.trim().length > 200 && vaultQs.length === 0) {
       const parsedFromVault = parseCbtHtmlFile(vaultHtml, safeId);
-      if (parsedFromVault && parsedFromVault.questions.length > 0) {
+      if (parsedFromVault && Array.isArray(parsedFromVault.questions) && parsedFromVault.questions.length > 0) {
         vaultQs = parsedFromVault.questions;
       }
     }
@@ -1265,7 +1265,7 @@ export async function loadTestBundleFromFirestore(
   let serverMeta: CbtTestMeta | undefined;
   try {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 15000);
+    const timer = window.setTimeout(() => controller.abort(), 45000);
     const res = await fetch(`/api/store/test/${encodeURIComponent(safeId)}`, {
       cache: 'no-store',
       signal: controller.signal,
@@ -1284,9 +1284,9 @@ export async function loadTestBundleFromFirestore(
           normalizeCbtQuestion(item, idx)
         );
       }
-      if (serverHtml.trim().length > 100 && !areQuestionsPlayable(serverQs)) {
+      if (serverHtml.trim().length > 100 && serverQs.length === 0) {
         const parsedFromHtml = parseCbtHtmlFile(serverHtml, serverMeta?.title || safeId);
-        if (parsedFromHtml && parsedFromHtml.questions.length > 0) {
+        if (parsedFromHtml && Array.isArray(parsedFromHtml.questions) && parsedFromHtml.questions.length > 0) {
           serverQs = parsedFromHtml.questions;
         }
       }
